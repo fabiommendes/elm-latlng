@@ -13,7 +13,7 @@ suite : Test
 suite =
     describe "Basic conversions"
         [ describe "LatLng parsing" <|
-            [ test "render origin" <| \_ -> E.equal (fromLatLonDegrees 0 0 |> toString) "0°0'00.00\"N 0°0'00.00\"E"
+            [ test "render origin" <| \_ -> E.equal (fromLatLngDegrees 0 0 |> toString) "0°0'00.00\"N 0°0'00.00\"E"
             , test "render br" <| \_ -> E.equal (br.center |> toString) "..."
             ]
         , describe "LatLng Transforms" <|
@@ -21,11 +21,11 @@ suite =
             , test "render br" <| \_ -> E.equal (br.center |> toString) "..."
             ]
         , describe "Decode/encode roundtrip"
-            [ fuzz2 (floatRange -180 180) (floatRange -90 90) "encode/decode roundtrip" <|
+            [ fuzz2 (floatRange -90 90) (floatRange -180 180) "encode/decode roundtrip" <|
                 \lat lng ->
                     let
                         loc =
-                            fromLatLonDegrees lat lng
+                            fromLatLngDegrees lat lng
                     in
                     case parse (toString loc) of
                         Just loc_ ->

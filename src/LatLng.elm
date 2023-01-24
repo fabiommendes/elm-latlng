@@ -1,40 +1,74 @@
 module LatLng exposing
-    ( Coord
-    , LatLng
-    , Path
-    , Polyline
-    , by
-    , center
-    , chain
-    , coord
-    , coordToString
-    , decoder
-    , distance
-    , eastBy
-    , eastByCoords
-    , encoder
-    , fromLatLon
-    , fromLatLonDegrees
-    , googleMapsUrl
-    , latitude
-    , longitude
-    , move
-    , moveEast
-    , moveNorth
-    , moveSouth
-    , moveWest
-    , northByCoords
-    , parse
-    , pathFrom
-    , pathFromCenter
-    , pathFromStart
-    , southBy
-    , southByCoords
-    , toAngle
-    , toString
-    , westBy
-    , westByCoords
+    ( LatLng, Coord, Polyline, Path
+    , fromLatLng, fromLatLngDegrees
+    , parse, toString, coordToString, googleMapsUrl
+    , latitude, longitude, coord, distance, toAngle
+    , by, eastBy, westBy, northBy, southBy
+    , move, moveEast, moveWest, moveNorth, moveSouth
+    , eastByCoords, westByCoords, northByCoords, southByCoords
+    , center, chain, pathFrom, pathFromCenter, pathFromStart
+    , encoder, decoder
     )
+
+{-|
+
+
+# Location objects
+
+This module provides a basic data structure to represent locations as a pair of latitude/longitude
+variables.
+
+
+## Types
+
+@docs LatLng, Coord, Polyline, Path
+
+
+## Creation
+
+@docs fromLatLng, fromLatLngDegrees
+
+
+## Parsing and rendering
+
+@docs parse, toString, coordToString, googleMapsUrl
+
+
+## Properties and comparison
+
+@docs latitude, longitude, coord, distance, toAngle
+
+
+## Moving points around
+
+We can move points specifying variations in lat/lon Angles, Meters or in Coords
+
+
+### By angle
+
+@docs by, eastBy, westBy, northBy, southBy
+
+
+### By length
+
+@docs move, moveEast, moveWest, moveNorth, moveSouth
+
+
+### By coord
+
+@docs eastByCoords, westByCoords, northByCoords, southByCoords
+
+
+## Paths and Polylines
+
+@docs center, chain, pathFrom, pathFromCenter, pathFromStart
+
+
+## Encoding/Decoding
+
+@docs encoder, decoder
+
+-}
 
 import Angle
 import Json.Decode as D
@@ -90,11 +124,15 @@ type alias Coord =
 -------------------------------------------------------------------------------
 
 
+{-| Encode LatLng as a JSON string
+-}
 encoder : LatLng -> E.Value
 encoder loc =
     E.string (toString loc)
 
 
+{-| Decode LatLng from a JSON string
+-}
 decoder : D.Decoder LatLng
 decoder =
     D.string
@@ -113,16 +151,16 @@ decoder =
 
 {-| Create location from lat/lng values
 -}
-fromLatLon : Angle -> Angle -> LatLng
-fromLatLon lat lng =
+fromLatLng : Angle -> Angle -> LatLng
+fromLatLng lat lng =
     LatLng { lat = lat, lng = lng }
 
 
 {-| Create location from lat/lng values
 -}
-fromLatLonDegrees : Float -> Float -> LatLng
-fromLatLonDegrees lat lng =
-    fromLatLon (Angle.degrees lat) (Angle.degrees lng)
+fromLatLngDegrees : Float -> Float -> LatLng
+fromLatLngDegrees lat lng =
+    fromLatLng (Angle.degrees lat) (Angle.degrees lng)
 
 
 {-| Return location\`s latitude
@@ -175,7 +213,7 @@ parse : String -> Maybe LatLng
 parse st =
     st
         |> P.run
-            (P.succeed fromLatLon
+            (P.succeed fromLatLng
                 |= P.map toAngle (coordP "N" "S")
                 |. P.spaces
                 |= P.map toAngle (coordP "E" "W")
@@ -212,51 +250,71 @@ coordP pos neg =
 -------------------------------------------------------------------------------
 
 
+{-| Move location by given lat and lng angles
+-}
 by : Angle -> Angle -> LatLng -> LatLng
 by x y (LatLng { lat, lng }) =
     LatLng { lat = Q.sum [ lat, x ], lng = Q.sum [ lng, y ] }
 
 
+{-| Move point north by given latitude angle
+-}
 northBy : Angle -> LatLng -> LatLng
 northBy x (LatLng { lat, lng }) =
     LatLng { lat = Q.sum [ lat, x ], lng = lng }
 
 
+{-| Move point south by given latitude angle
+-}
 southBy : Angle -> LatLng -> LatLng
 southBy x =
     northBy (Q.negate x)
 
 
+{-| Move point east by given longitude angle
+-}
 eastBy : Angle -> LatLng -> LatLng
 eastBy x (LatLng { lat, lng }) =
     LatLng { lat = lat, lng = Q.sum [ lng, x ] }
 
 
+{-| Move point west by given longitude angle
+-}
 westBy : Angle -> LatLng -> LatLng
 westBy x =
     eastBy (Q.negate x)
 
 
+{-| Move point south by given latitude cooordinates (in degrees, minutes, seconds, milliseconds)
+-}
 northByCoords : Int -> Int -> Int -> Int -> LatLng -> LatLng
 northByCoords =
     byCoord northBy
 
 
+{-| Move point south by given latitude cooordinates (in degrees, minutes, seconds, milliseconds)
+-}
 southByCoords : Int -> Int -> Int -> Int -> LatLng -> LatLng
 southByCoords =
     byCoord southBy
 
 
+{-| Move point west by given longitude cooordinates (in degrees, minutes, seconds, milliseconds)
+-}
 westByCoords : Int -> Int -> Int -> Int -> LatLng -> LatLng
 westByCoords =
     byCoord westBy
 
 
+{-| Move point east by given longitude cooordinates (in degrees, minutes, seconds, milliseconds)
+-}
 eastByCoords : Int -> Int -> Int -> Int -> LatLng -> LatLng
 eastByCoords =
     byCoord eastBy
 
 
+{-| Move point by (x, y) distance
+-}
 move : Length -> Length -> LatLng -> LatLng
 move x y loc =
     by
@@ -265,26 +323,48 @@ move x y loc =
         loc
 
 
+{-| Move point north by given distance
+-}
 moveNorth : Length -> LatLng -> LatLng
 moveNorth x =
     move x (Length.meters 0)
 
 
+{-| Move point south by given distance
+-}
 moveSouth : Length -> LatLng -> LatLng
 moveSouth x =
     moveNorth (Q.negate x)
 
 
+{-| Move point east by given distance
+-}
 moveEast : Length -> LatLng -> LatLng
 moveEast x =
     move (Length.meters 0) x
 
 
+{-| Move point west by given distance
+-}
 moveWest : Length -> LatLng -> LatLng
 moveWest x =
     moveEast (Q.negate x)
 
 
+{-| Make a chain of transformations in the given point
+
+Each transformation is typically an operation like `moveNorth (meters 5)`
+
+Return a list of partial applications.
+
+Example:
+chain loc
+[ move (meters 60) (meters 10)
+, northByCoords 0 0 1 256
+, westBy (Angle.degrees 180)
+]
+
+-}
 chain : LatLng -> List (LatLng -> LatLng) -> List LatLng
 chain start =
     List.drop 1
@@ -407,18 +487,27 @@ pathFrom (LatLng { lat, lng }) =
     List.map toCoord
 
 
-pathFromStart : List LatLng -> Path
+{-| Convert Polyline into path
+
+Works like pathFrom, but uses the first element of list as the origin reference
+
+-}
+pathFromStart : Polyline -> Path
 pathFromStart poly =
     List.head poly
         |> Maybe.map (\x -> pathFrom x poly)
         |> Maybe.withDefault []
 
 
+{-| Convert Polyline into path, taking the center point as the origin.
+-}
 pathFromCenter : Polyline -> Path
 pathFromCenter poly =
     pathFrom (center poly) poly
 
 
+{-| Computes the center point of the polyline
+-}
 center : Polyline -> LatLng
 center poly =
     let

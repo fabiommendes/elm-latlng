@@ -1,8 +1,24 @@
-module Places exposing (..)
+module Places exposing (Country, br)
+
+{-|
+
+
+# A database of places and their coordinates
+
+A non-comprehensive database of locations of real places.
+
+
+## Countries
+
+@docs Country, br
+
+-}
 
 import LatLng exposing (..)
 
 
+{-| Some important points in a Country
+-}
 type alias Country =
     { center : LatLng
     , north : LatLng
@@ -13,12 +29,14 @@ type alias Country =
     }
 
 
+{-| Brazil
+-}
 br : Country
 br =
-    { center = fromLatLonDegrees 10 10
-    , north = fromLatLonDegrees 10 10
-    , south = fromLatLonDegrees 10 10
-    , east = fromLatLonDegrees 10 10
-    , west = fromLatLonDegrees 10 10
-    , capital = fromLatLonDegrees 10 10
+    { center = fromLatLngDegrees 0 0
+    , north = fromLatLngDegrees 0 0
+    , south = fromLatLngDegrees 0 0
+    , east = fromLatLngDegrees 0 0
+    , west = fromLatLngDegrees 0 0
+    , capital = fromLatLngDegrees 0 0
     }
