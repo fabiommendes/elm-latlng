@@ -1,6 +1,6 @@
 {
     "type": "package",
-    "name": "fabiommendes/elm-roman",
+    "name": "fabiommendes/elm-latlng",
     "summary": "Parse and render Roman numerals",
     "license": "BSD-3-Clause",
     "version": "1.0.0",
