@@ -1,4 +1,7 @@
-module Places exposing (Country, br)
+module Places exposing
+    ( Country, br
+    , origin
+    )
 
 {-|
 
@@ -11,6 +14,11 @@ A non-comprehensive database of locations of real places.
 ## Countries
 
 @docs Country, br
+
+
+## References
+
+@docs origin
 
 -}
 
@@ -33,10 +41,17 @@ type alias Country =
 -}
 br : Country
 br =
-    { center = fromLatLngDegrees 0 0
-    , north = fromLatLngDegrees 0 0
-    , south = fromLatLngDegrees 0 0
-    , east = fromLatLngDegrees 0 0
-    , west = fromLatLngDegrees 0 0
-    , capital = fromLatLngDegrees 0 0
+    { center = fromLatLngDegrees -15.676745 -47.678328
+    , north = fromLatLngDegrees 4.443417 -51.519399
+    , south = fromLatLngDegrees -33.751085 -53.394833
+    , east = fromLatLngDegrees -7.155056 -34.793143
+    , west = fromLatLngDegrees -7.534318 -73.982792
+    , capital = fromLatLngDegrees -15.790673 -47.892816
     }
+
+
+{-| Coordiante 0 0
+-}
+origin : LatLng
+origin =
+    fromLatLngDegrees 0 0

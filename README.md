@@ -9,9 +9,9 @@ We can create LatLng objects from coordinates and perform explicit manipulations
 ```elm
 import LatLng as exposing (..)
 import LatLng.Places as Places
-import Unit exposing meters
+import Length exposing kilometers  -- from ianmackenzie/elm-units
 
 loc1 = Places.br.north
 loc2 = Places.br.south
-distance loc1 loc2 ==> (meters 5000)
+distance loc1 loc2 ==> (kilometers 5000)
 ```

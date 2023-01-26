@@ -1,13 +1,14 @@
 module LatLng exposing
     ( LatLng, Coord, Polyline, Path
     , fromLatLng, fromLatLngDegrees
-    , parse, toString, coordToString, googleMapsUrl
-    , latitude, longitude, coord, distance, toAngle
+    , parse, parsePair, toString, coordToString, googleMapsUrl
+    , latitude, longitude, coord, distance, toAngle, toTupleDegrees
     , by, eastBy, westBy, northBy, southBy
     , move, moveEast, moveWest, moveNorth, moveSouth
     , eastByCoords, westByCoords, northByCoords, southByCoords
     , center, chain, pathFrom, pathFromCenter, pathFromStart
-    , encoder, decoder
+    , encoder, decoder, decodePair, decodePretty, decodeTuple
+    , Angle, Length, parseCoord
     )
 
 {-|
@@ -21,7 +22,7 @@ variables.
 
 ## Types
 
-@docs LatLng, Coord, Polyline, Path
+@docs LatLng, Coord, Polyline, Path, Angle, Length
 
 
 ## Creation
@@ -31,12 +32,12 @@ variables.
 
 ## Parsing and rendering
 
-@docs parse, toString, coordToString, googleMapsUrl
+@docs parse, parsePair, parseCoord, toString, coordToString, googleMapsUrl
 
 
 ## Properties and comparison
 
-@docs latitude, longitude, coord, distance, toAngle
+@docs latitude, longitude, coord, distance, toAngle, toTupleDegrees
 
 
 ## Moving points around
@@ -66,7 +67,7 @@ We can move points specifying variations in lat/lon Angles, Meters or in Coords
 
 ## Encoding/Decoding
 
-@docs encoder, decoder
+@docs encoder, decoder, decodePair, decodePretty, decodeTuple
 
 -}
 
@@ -74,16 +75,21 @@ import Angle
 import Json.Decode as D
 import Json.Encode as E
 import Length
-import Maybe.Extra
+import Maybe.Extra as Maybe
 import Parser as P exposing ((|.), (|=), Parser)
+import Parser.Advanced as PA
 import Quantity as Q
 import Round
 
 
+{-| Re-expose Length from elm-units
+-}
 type alias Length =
     Length.Length
 
 
+{-| Re-expose Angle from elm-units
+-}
 type alias Angle =
     Angle.Angle
 
@@ -131,15 +137,53 @@ encoder loc =
     E.string (toString loc)
 
 
-{-| Decode LatLng from a JSON string
+{-| Decode LatLng from a known format
 -}
 decoder : D.Decoder LatLng
 decoder =
+    D.oneOf
+        [ decodePretty
+        , decodePair
+        ]
+
+
+{-| Decode LatLng from a prettified representation in a JSON string
+-}
+decodePretty : D.Decoder LatLng
+decodePretty =
     D.string
         |> D.andThen
             (\s ->
                 parse s
-                    |> Maybe.Extra.unwrap (D.fail "invalid location") D.succeed
+                    |> Maybe.unwrap (D.fail "invalid lat/lon location") D.succeed
+            )
+
+
+{-| Decode location from a string with a pair of floats
+-}
+decodePair : D.Decoder LatLng
+decodePair =
+    D.string
+        |> D.andThen
+            (\s ->
+                parsePair s
+                    |> Maybe.unwrap (D.fail "invalid coordinate pair") D.succeed
+            )
+
+
+{-| Decode location from a string with a pair of floats
+-}
+decodeTuple : D.Decoder LatLng
+decodeTuple =
+    D.list D.float
+        |> D.andThen
+            (\lst ->
+                case lst of
+                    [ x, y ] ->
+                        D.succeed (fromLatLngDegrees x y)
+
+                    _ ->
+                        D.fail "invalid pair of coordinates"
             )
 
 
@@ -184,6 +228,13 @@ toString (LatLng { lat, lng }) =
     coordToString lat "N" "S" ++ " " ++ coordToString lng "E" "W"
 
 
+{-| Convert LatLng to a tuple of floats
+-}
+toTupleDegrees : LatLng -> ( Float, Float )
+toTupleDegrees loc =
+    ( latitude loc |> Angle.inDegrees, longitude loc |> Angle.inDegrees )
+
+
 {-| Format a decimal latitude or longitude coordinate
 
     coordToString -45.5 "N" "S" ==> "45°30'00.00\"S"
@@ -214,34 +265,82 @@ parse st =
     st
         |> P.run
             (P.succeed fromLatLng
-                |= P.map toAngle (coordP "N" "S")
+                |= P.map toAngle (coordParser "N" "S")
                 |. P.spaces
-                |= P.map toAngle (coordP "E" "W")
+                |= P.map toAngle (coordParser "E" "W")
+                |. P.end
             )
         |> Result.toMaybe
 
 
-coordP : String -> String -> Parser Coord
-coordP pos neg =
+{-| Convert string with a pair of floats to a LatLng pair
+-}
+parsePair : String -> Maybe LatLng
+parsePair st =
+    let
+        signedFloat =
+            P.oneOf
+                [ P.succeed negate
+                    |. P.symbol "-"
+                    |= P.float
+                , P.float
+                ]
+    in
+    st
+        |> P.run
+            (P.succeed fromLatLngDegrees
+                |= signedFloat
+                |. P.spaces
+                |. P.token ","
+                |. P.spaces
+                |= signedFloat
+                |. P.end
+            )
+        |> Result.toMaybe
+
+
+{-| Parse a single coordinate with the given pair of directions
+
+This can be used to specify the N-S or E-W directions or localized
+versions of those symbols
+
+Example
+parseCoord ("L", "O") "45°10'50.12L"
+==> Coord 1 45 10 50 120
+
+-}
+parseCoord : ( String, String ) -> String -> Maybe Coord
+parseCoord ( a, b ) =
+    P.run (coordParser a b |. P.end) >> Result.toMaybe
+
+
+coordParser : String -> String -> Parser Coord
+coordParser pos neg =
     let
         opt x st =
-            P.succeed x |. P.token st
-
-        digit =
-            P.oneOf (List.map (\x -> opt x (String.fromInt x)) (List.range 0 9))
+            P.succeed x |. P.symbol st
     in
-    P.succeed (\d m s frac1 frac2 mul -> Coord mul d m s (100 * frac1 + 10 * frac2))
+    P.succeed
+        (\deg min secMs sign ->
+            let
+                sec =
+                    truncate secMs
+
+                ms =
+                    (secMs - toFloat sec) * 1000 |> truncate
+            in
+            Coord sign deg min sec ms
+        )
         |= P.int
-        |. P.token "°"
+        |. P.symbol "°"
         |= P.int
-        |. P.token "'"
-        |= P.int
-        |. P.token "."
-        |= digit
-        |= digit
-        |. P.token "\""
+        |. P.symbol "'"
+        |= P.oneOf
+            [ P.symbol "0" |> P.andThen (\_ -> P.float)
+            , P.float
+            ]
+        |. P.symbol "\""
         |= P.oneOf [ opt 1 pos, opt -1 neg ]
-        |. P.end
 
 
 
@@ -327,7 +426,7 @@ move x y loc =
 -}
 moveNorth : Length -> LatLng -> LatLng
 moveNorth x =
-    move x (Length.meters 0)
+    move x zero
 
 
 {-| Move point south by given distance
@@ -341,7 +440,7 @@ moveSouth x =
 -}
 moveEast : Length -> LatLng -> LatLng
 moveEast x =
-    move (Length.meters 0) x
+    move zero x
 
 
 {-| Move point west by given distance
@@ -358,11 +457,12 @@ Each transformation is typically an operation like `moveNorth (meters 5)`
 Return a list of partial applications.
 
 Example:
-chain loc
-[ move (meters 60) (meters 10)
-, northByCoords 0 0 1 256
-, westBy (Angle.degrees 180)
-]
+
+    chain loc
+        [ move (meters 60) (meters 10)
+        , northByCoords 0 0 1 256
+        , westBy (Angle.degrees 180)
+        ]
 
 -}
 chain : LatLng -> List (LatLng -> LatLng) -> List LatLng
@@ -529,6 +629,11 @@ center poly =
 byCoord : (Angle -> a) -> Int -> Int -> Int -> Int -> a
 byCoord f =
     \deg min sec ms -> f (toAngle (Coord 1 deg min sec ms))
+
+
+zero : Length.Length
+zero =
+    Length.meters 0
 
 
 earthRadius : Float
